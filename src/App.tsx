@@ -12,8 +12,13 @@ import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import FilterModal from './components/FilterModal';
 import FilterComponent from './components/FilterComponent';
-import TableComponent from './components/TableComponent';
+import TableComponent from './components/table/DynamicTable';
 import TopBar from './components/TopBar';
+import { Provider } from 'react-redux';
+import configureStore from './store/configureStore';
+
+const store = configureStore();
+
 
 const lightTheme = createTheme({
   palette: {
@@ -31,6 +36,34 @@ const darkTheme = createTheme({
   },
 });
 
+interface Row {
+  id: number;
+  name: string;
+  age: number;
+}
+
+// Sample data
+const rowsData: Row[] = [
+  { id: 1, name: 'John Doe', age: 28 },
+  { id: 2, name: 'Jane Smith', age: 34 },
+  { id: 3, name: 'Alice Johnson', age: 45 },
+  { id: 4, name: 'Bob Brown', age: 23 },
+  { id: 5, name: 'Carol White', age: 38 },
+  { id: 6, name: 'Dan Black', age: 50 },
+  { id: 7, name: 'Eve Green', age: 29 },
+];
+
+interface Column {
+  id: keyof Row;
+  label: string;
+}
+
+// const columns: Column[] = [
+//   { id: 'id', label: 'ID' },
+//   { id: 'name', label: 'Name' },
+//   { id: 'age', label: 'Age' },
+// ];
+
 const App: React.FC = () => {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -40,30 +73,33 @@ const App: React.FC = () => {
   const closeFilter = () => setIsFilterOpen(false);
 
   return (
-    <ThemeProvider theme={isDarkMode ? darkTheme : lightTheme}>
-      <CssBaseline />
-      <GlobalStyles styles={{ body: { transition: 'background-color 0.5s ease, color 0.5s ease' } }} />
-      <TopBar isDarkMode={isDarkMode} toggleTheme={toggleTheme} />
-      <Box sx={{ p: 2 }}>
-        {/* Theme toggler */}
-        <Button
-          variant="contained"
-          onClick={toggleTheme}
-          startIcon={isDarkMode ? <Brightness7Icon /> : <Brightness4Icon />}
-        >
-          Switch to {isDarkMode ? 'Light' : 'Dark'} Mode
-        </Button>
+    <Provider store={store}>
 
-        {/* Filter component and modal */}
-        <Box sx={{ mt: 2 }}>
-          <FilterComponent onOpenFilter={openFilter} />
-          <FilterModal open={isFilterOpen} handleClose={closeFilter} />
+      <ThemeProvider theme={isDarkMode ? darkTheme : lightTheme}>
+        <CssBaseline />
+        <GlobalStyles styles={{ body: { transition: 'background-color 0.5s ease, color 0.5s ease' } }} />
+        <TopBar isDarkMode={isDarkMode} toggleTheme={toggleTheme} />
+        <Box sx={{ p: 2 }}>
+          {/* Theme toggler */}
+          <Button
+            variant="contained"
+            onClick={toggleTheme}
+            startIcon={isDarkMode ? <Brightness7Icon /> : <Brightness4Icon />}
+          >
+            Switch to {isDarkMode ? 'Light' : 'Dark'} Mode
+          </Button>
+
+          {/* Filter component and modal */}
+          <Box sx={{ mt: 2 }}>
+            <FilterComponent onOpenFilter={openFilter} />
+            <FilterModal open={isFilterOpen} handleClose={closeFilter} />
+          </Box>
+
+          {/* Table component */}
+          <TableComponent  />
         </Box>
-
-        {/* Table component */}
-        <TableComponent />
-      </Box>
-    </ThemeProvider>
+      </ThemeProvider>
+    </Provider>
   );
 };
 
