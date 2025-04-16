@@ -1,0 +1,27 @@
+// App.tsx
+import React, { useState } from 'react';
+import { Button } from '@mui/material';
+import FilterListIcon from '@mui/icons-material/FilterList';
+import FilterModal from './components/FilterModal';
+
+const App: React.FC = () => {
+  const [open, setOpen] = useState(false);
+
+  const handleOpen = () => setOpen(true);
+  const handleClose = () => setOpen(false);
+
+  return (
+    <div style={{ padding: '2rem' }}>
+      <Button
+        variant="outlined"
+        startIcon={<FilterListIcon />}
+        onClick={handleOpen}
+      >
+        Filters
+      </Button>
+      <FilterModal open={open} handleClose={handleClose} />
+    </div>
+  );
+};
+
+export default App;

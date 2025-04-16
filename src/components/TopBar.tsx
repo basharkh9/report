@@ -61,7 +61,7 @@ const TopBar: React.FC<TopBarProps> = ({ isDarkMode, toggleTheme }) => {
                         }}
                     >
 
-                        <FilterComponent onOpenFilter={openFilter} />
+                        <FilterComponent />
                         <FilterModal open={isFilterOpen} handleClose={closeFilter} />
                     </Box>
 

@@ -244,19 +244,44 @@ const DynamicTable: React.FC<any> = () => {
     return (
         <div ref={containerRef}>
             {/* Copy Tool */}
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1, p: 1 }}>
-                <IconButton onClick={handleCopy} disabled={!selectedCellText}>
-                    <ContentCopyIcon />
-                </IconButton>
-                {selectedCellText && (
+            <Box
+                sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    mb: 1,
+                    p: 1,
+                    minHeight: 48, // Reserve fixed height so layout doesn't collapse.
+                }}
+            >
+                {/* Always render a container for the copy button */}
+                <Box
+                    sx={{
+                        width: 48, // Fixed width to preserve space
+                        transition: 'opacity 300ms',
+                        opacity: selectedCellText ? 1 : 0, // Animate opacity based on selection
+                    }}
+                >
+                    <IconButton onClick={handleCopy} disabled={!selectedCellText}>
+                        <ContentCopyIcon />
+                    </IconButton>
+                </Box>
+                {/* Always render a container for the copy text field */}
+                <Box
+                    sx={{
+                        flexGrow: 1,
+                        transition: 'opacity 300ms',
+                        opacity: selectedCellText ? 1 : 0, // Animate opacity
+                    }}
+                >
                     <TextField
                         variant="outlined"
                         size="small"
-                        value={selectedCellText}
+                        value={selectedCellText || ''}
                         inputProps={{ readOnly: true }}
-                        sx={{ ml: 1, flexGrow: 1 }}
+                        fullWidth
+                    // Optionally, you can add a transition style directly in the sx prop.
                     />
-                )}
+                </Box>
             </Box>
 
             {/* Filter Modal */}

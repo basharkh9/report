@@ -16,6 +16,7 @@ import TableComponent from './components/table/DynamicTable';
 import TopBar from './components/TopBar';
 import { Provider } from 'react-redux';
 import configureStore from './store/configureStore';
+import ReportsFilters from './components/ReportsFilters';
 
 const store = configureStore();
 
@@ -88,12 +89,6 @@ const App: React.FC = () => {
           >
             Switch to {isDarkMode ? 'Light' : 'Dark'} Mode
           </Button>
-
-          {/* Filter component and modal */}
-          <Box sx={{ mt: 2 }}>
-            <FilterComponent onOpenFilter={openFilter} />
-            <FilterModal open={isFilterOpen} handleClose={closeFilter} />
-          </Box>
 
           {/* Table component */}
           <TableComponent  />

@@ -5,7 +5,7 @@ import FilterListIcon from '@mui/icons-material/FilterList';
 import DynamicFilterForm, { FilterField } from './DynamicFilterForm';
 import FilterModalWrapper from './FilterModalWrapper';
 
-// Example reports configuration array.
+// Example reports configuration.
 const reportConfigs = [
   {
     id: "callWorkDailyReport",
@@ -29,22 +29,6 @@ const reportConfigs = [
       { name: "mediaType", type: "String", label: "Media Type" }
     ]
   },
-  {
-    id: "callWorkDailyReport2",
-    label: "Call Work Daily Report 2",
-    filters: [
-      { name: "fromDate", type: "Date", label: "From Date" },
-      { name: "toDate", type: "Date", label: "To Date" },
-      { name: "queueId", type: "String", label: "Queue Id" },
-      {
-        name: "direction",
-        type: "Enum",
-        label: "Direction",
-        options: [ "OUTBOUND", "INBOUND" ]
-      },
-      { name: "mediaType", type: "String", label: "Media Type" }
-    ]
-  },
   // You can add additional report configurations here.
 ];
 
@@ -58,14 +42,8 @@ const FilterComponent: React.FC = () => {
 
   const handleApplyFilters = (values: Record<string, any>) => {
     console.log("Filters applied for", selectedReport?.label, values);
-    // Handle filter values as needed (e.g., dispatch to Redux, API call, etc.)
+    // Dispatch actions or update state as needed.
     setOpen(false);
-  };
-
-  // When opening the modal, reset the selected report.
-  const handleOpenModal = () => {
-    setSelectedReportId(""); // Reset so no report is selected by default.
-    setOpen(true);
   };
 
   return (
@@ -73,7 +51,7 @@ const FilterComponent: React.FC = () => {
       <Button
         variant="outlined"
         startIcon={<FilterListIcon />}
-        onClick={handleOpenModal}
+        onClick={() => setOpen(true)}
       >
         Advanced Search
       </Button>
@@ -81,7 +59,7 @@ const FilterComponent: React.FC = () => {
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>Advanced Search</DialogTitle>
         <DialogContent dividers>
-          {/* Report drop down with an empty default value */}
+          {/* Report drop-down. */}
           <TextField
             select
             label="Select Report"
@@ -100,7 +78,7 @@ const FilterComponent: React.FC = () => {
             ))}
           </TextField>
 
-          {/* Render dynamic filter form only if a report has been selected */}
+          {/* Render dynamic filter form only if a report has been selected. */}
           {selectedReport ? (
             <DynamicFilterForm
               filters={selectedReport.filters as FilterField[]}
