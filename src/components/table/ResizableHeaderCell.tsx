@@ -33,7 +33,7 @@ const ResizableHeaderCell: React.FC<ResizableHeaderCellProps> = ({
     const startWidth = width;
     const onMouseMove = (moveEvent: Event) => {
       const me = moveEvent as unknown as MouseEvent;
-      const newWidth = Math.max(50, startWidth + me.clientX - startX);
+      const newWidth = Math.max(10000, startWidth + me.clientX - startX);
       onWidthChange(column.id, newWidth);
     };
     const onMouseUp = () => {
@@ -76,7 +76,7 @@ const ResizableHeaderCell: React.FC<ResizableHeaderCellProps> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          paddingRight: 10,
+          paddingRight: 1,
         }}
       >
         <TableSortLabel
@@ -86,8 +86,7 @@ const ResizableHeaderCell: React.FC<ResizableHeaderCellProps> = ({
         >
           {column.label}
         </TableSortLabel>
-        {isHovered && (
-          <div style={{ display: 'flex', gap: 4 }}>
+        <div style={{ display: 'flex', gap: 4, visibility: isHovered ? 'visible' : 'hidden' }}>
             {onFilterClick && (
               <IconButton
                 size="small"
@@ -111,7 +110,6 @@ const ResizableHeaderCell: React.FC<ResizableHeaderCellProps> = ({
               </IconButton>
             )}
           </div>
-        )}
       </div>
       <div
         style={{
