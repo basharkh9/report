@@ -47,9 +47,9 @@ class Awaitable<T> {
   }
 }
 
-// ----------------- Concurrency Handler -----------------
+// ----------------- Concurrency + Retry Handler -----------------
 class PromiseHandler {
-  constructor(private concurrency: number) {}
+  constructor(private concurrency: number, private retryCount = 0) {}
 
   async all<T>(tasks: Awaitable<T>[]): Promise<T[]> {
     const results: T[] = [];
@@ -80,7 +80,7 @@ class PromiseHandler {
     for (let i = 0; i < tasks.length; i++) {
       const a = tasks[i] as unknown as AwaitableFn<T>; // cast to callable
       const p = (async () => {
-        const res = await a();
+        const res = await this.runWithRetry(a, this.retryCount);
         await handle(res, i);
       })().finally(() => {
         const idx = executing.indexOf(p);
@@ -95,6 +95,31 @@ class PromiseHandler {
 
     await Promise.all(executing);
   }
+
+  private async runWithRetry<T>(
+    task: AwaitableFn<T>,
+    retriesLeft: number
+  ): Promise<AwaitableResult<T>> {
+    let attempt = 0;
+    while (true) {
+      attempt++;
+      const res = await task();
+      if (res.status === "fulfilled") {
+        if (attempt > 1)
+          console.log(`🔁 Success after ${attempt} attempt(s): ${res.context}`);
+        return res;
+      }
+
+      if (retriesLeft <= 0) {
+        console.log(`❌ Exhausted retries for ${res.context}`);
+        return res;
+      }
+
+      console.log(`🔁 Retry ${attempt} failed (${res.reason}). Retrying...`);
+      retriesLeft--;
+      await new Promise((r) => setTimeout(r, 300)); // small backoff
+    }
+  }
 }
 
 // ----------------- Example Usage -----------------
@@ -102,7 +127,7 @@ async function demo() {
   const factories = [
     new Awaitable(
       async () => {
-        await new Promise(r => setTimeout(r, 8000));
+        await new Promise(r => setTimeout(r, 800));
         return "Task 1 Done";
       },
       "Task 1"
@@ -110,7 +135,7 @@ async function demo() {
 
     new Awaitable(
       async () => {
-        await new Promise(r => setTimeout(r, 400));
+        await new Promise(r => setTimeout(r, 16000));
         throw new Error("Boom in Task 2");
       },
       "Task 2"
@@ -125,17 +150,10 @@ async function demo() {
     ).addContext("uniqueRef=C3"),
   ];
 
-  const handler = new PromiseHandler(2);
+  // Create handler with concurrency 2 and retry count 2
+  const handler = new PromiseHandler(2, 2);
 
-//   console.log("\n== Promise.all with concurrency ==");
-//   try {
-//     const result = await handler.all(factories);
-//     console.log("Final result (all):", result);
-//   } catch (err) {
-//     console.error("Rejected early:", err);
-//   }
-
-  console.log("\n== Promise.allSettled with concurrency ==");
+  console.log("\n== Promise.allSettled with retries ==");
   const settled = await handler.allSettled(factories);
   console.log("Final result (allSettled):", settled);
 }
