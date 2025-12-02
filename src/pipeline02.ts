@@ -108,9 +108,36 @@ type FilterSpec<T> = {
 /** $sort on array fields */
 type SortDirection = 1 | -1;
 
-type SortSpec<T> = {
-  input: DotNestedKeys<T>;
-  sortBy: Record<string, SortDirection>;  // element-level paths as strings
+type ElementForPath<T, P extends string> = ArrayElement<ExtractNestedType<T, P>>;
+
+type SortConfigFor<T, P extends string> = {
+  /**
+   * field:
+   *  - DotNestedKeys<ElementForPath<T,P>> → strongly-typed paths for element
+   *  - string → also allow projected / added fields
+   */
+  field: DotNestedKeys<ElementForPath<T, P>> | string;
+  direction?: SortDirection;               // default: 1
+  nulls?: 'first' | 'last';                // how to order null/undefined
+  insensitive?: boolean;                   // case-insensitive for strings
+};
+
+type SortSpec<T, P extends DotNestedKeys<T> = DotNestedKeys<T>> = {
+  input: P;
+  /**
+   * Preferred modern syntax:
+   *
+   * by: [
+   *   { field: 'isPositive', direction: -1 },
+   *   { field: 'totalAmount', direction: 1, nulls: 'last' }
+   * ]
+   *
+   * Legacy syntax (still supported):
+   *
+   * sortBy: { totalAmount: 1, status: -1 }
+   */
+  by?: SortConfigFor<T, P>[];
+  sortBy?: Record<string, SortDirection>;
 };
 
 /** $group accumulators */
@@ -145,8 +172,8 @@ type Pipeline<T> = Stage<T>[];
 
 function getValueByPath(obj: any, path: string): any {
   if (!path) return obj;
-  return path.split('.').reduce((acc, key) =>
-    acc == null ? undefined : acc[key],
+  return path.split('.').reduce(
+    (acc, key) => (acc == null ? undefined : acc[key]),
     obj
   );
 }
@@ -262,7 +289,7 @@ function runPipeline(doc: any, pipeline: any[]): any {
       const out: any = {};
 
       for (const key of Object.keys(spec)) {
-        const sub = (spec as any)[key] as any[];       // runtime pipeline
+        const sub = (spec as any)[key] as any[]; // runtime pipeline
         const value = current[key];
 
         if (Array.isArray(value)) {
@@ -282,9 +309,7 @@ function runPipeline(doc: any, pipeline: any[]): any {
       const spec = stage.$filter as FilterSpec<any>;
       const arr = getValueByPath(current, spec.input);
 
-      if (!Array.isArray(arr)) {
-        continue;
-      }
+      if (!Array.isArray(arr)) continue;
 
       // optional: runtime homogeneous check
       if (arr.length > 1) {
@@ -298,28 +323,84 @@ function runPipeline(doc: any, pipeline: any[]): any {
       setValueByPath(current, spec.input as string, filtered);
     }
 
-    /* ----- $sort (arrays only) ----- */
+    /* ----- $sort (arrays only, multi-field, nulls, insensitive) ----- */
     else if ('$sort' in stage) {
       const spec = stage.$sort as SortSpec<any>;
       const arr = getValueByPath(current, spec.input);
 
       if (!Array.isArray(arr)) continue;
 
-      const entries = Object.entries(spec.sortBy);
-      if (!entries.length) continue;
+      // Normalize config: prefer `by`, fallback to legacy `sortBy`
+      const normalizedConfigs: {
+        field: string;
+        direction: SortDirection;
+        nulls?: 'first' | 'last';
+        insensitive?: boolean;
+      }[] =
+        spec.by && spec.by.length
+          ? spec.by.map(cfg => ({
+              field: cfg.field as string,
+              direction: cfg.direction ?? 1,
+              nulls: cfg.nulls,
+              insensitive: cfg.insensitive,
+            }))
+          : Object.entries(spec.sortBy ?? {}).map(([field, dir]) => ({
+              field,
+              direction: dir as SortDirection,
+            }));
 
-      const [field, dirRaw] = entries[0];
-      const dir = dirRaw as SortDirection;
+      if (!normalizedConfigs.length) continue;
+
+      const getVal = (obj: any, field: string) =>
+        field.includes(".")
+          ? getValueByPath(obj, field)
+          : obj[field];
 
       const sorted = [...arr].sort((a, b) => {
-        const av = getValueByPath(a, field);
-        const bv = getValueByPath(b, field);
-        if (av < bv) return -1 * dir;
-        if (av > bv) return  1 * dir;
+        for (const cfg of normalizedConfigs) {
+          const dir = cfg.direction ?? 1;
+          const field = cfg.field;
+          const nulls = cfg.nulls;
+          const insensitive = cfg.insensitive;
+
+          let av = getVal(a, field);
+          let bv = getVal(b, field);
+
+          // null / undefined handling
+          const aNull = av === null || av === undefined;
+          const bNull = bv === null || bv === undefined;
+
+          if (aNull || bNull) {
+            if (aNull && bNull) {
+              continue; // equal, check next sort config
+            }
+            // one is null, one is not
+            if (nulls === 'first') {
+              return aNull ? -1 : 1;
+            } else if (nulls === 'last') {
+              return aNull ? 1 : -1;
+            } else {
+              // default: nulls treated as lowest
+              return aNull ? -1 : 1;
+            }
+          }
+
+          // case-insensitive string comparison
+          if (insensitive && typeof av === 'string' && typeof bv === 'string') {
+            av = av.toLowerCase();
+            bv = bv.toLowerCase();
+          }
+
+          if (av < bv) return -1 * dir;
+          if (av > bv) return  1 * dir;
+          // equal → move on to next field
+        }
         return 0;
       });
 
-      setValueByPath(current, spec.input as string, sorted);
+      const cloned = structuredClone(current);
+      setValueByPath(cloned, spec.input as string, sorted);
+      current = cloned;
     }
 
     /* ----- $group (arrays only) ----- */
@@ -411,12 +492,6 @@ type TResponse = {
 
 const pipeline: Pipeline<TResponse> = [
   {
-    $filter: {
-      input: 'accounts',
-      cond: { $gte: ['balance.amount', 1000] }
-    }
-  },
-  {
     $map: {
       accounts: [
         {
@@ -451,6 +526,19 @@ const pipeline: Pipeline<TResponse> = [
         }
       ]
     }
+  },
+  // Multi-sort example: positive first, then by totalAmount asc, then currencyType asc (case-insensitive)
+  {
+    $sort: {
+      input: 'accounts',
+      by: [
+        { field: 'isPositive', direction: -1, nulls: 'last' },
+        { field: 'totalAmount', direction: 1 },
+        { field: 'currencyType', direction: 1, insensitive: true }
+      ]
+      // Legacy still works:
+      // sortBy: { totalAmount: 1 }
+    }
   }
 ];
 
@@ -468,6 +556,12 @@ const response: TResponse = {
       status: "suspended",
       balance: { amount: -100, currency: "AED" }
     },
+    {
+      id: 3,
+      name: "Salary Account",
+      status: "active",
+      balance: { amount: 1500, currency: "aed" }
+    }
   ],
   user: {
     name: "John Doe",
@@ -477,32 +571,3 @@ const response: TResponse = {
 
 const result = evaluatePipeline(response, pipeline);
 console.log('RESULT:', JSON.stringify(result, null, 2));
-/*
-Expected shape:
-
-{
-  "accounts": [
-    {
-      "id": 1,
-      "accountName": "Savings Account",
-      "totalAmount": 1500,
-      "currencyType": "USD",
-      "status": "active",
-      "isPositive": true,
-      "isValidAccount": true
-    },
-    {
-      "id": 2,
-      "accountName": "Checking Account",
-      "totalAmount": -100,
-      "currencyType": "AED",
-      "status": "suspended",
-      "isPositive": false,
-      "isValidAccount": false
-    }
-  ],
-  "user": {
-    "userAge": 30
-  }
-}
-*/
