@@ -245,3 +245,38 @@ ws.on("connection", (socket) => {
         }, null, 2));
     });
 });
+
+interface TranscriptEntry {
+  speaker: "agent" | "customer";
+  startMs: number;
+  endMs: number;
+  text: string;
+}
+
+function msToHhMmSs(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+
+  return (
+    String(h).padStart(2, "0") + ":" +
+    String(m).padStart(2, "0") + ":" +
+    String(s).padStart(2, "0")
+  );
+}
+
+export function formatTranscriptTimerBased(entries: TranscriptEntry[]): string {
+  const ordered = [...entries].sort((a, b) => a.startMs - b.startMs);
+
+  return ordered
+    .map(e => {
+      const start = msToHhMmSs(e.startMs);
+      const end = msToHhMmSs(e.endMs);
+      const speaker = e.speaker;
+      const text = (e.text ?? "").trim();
+
+      return `[[${start} - ${end}]] ${speaker}: ${text}`;
+    })
+    .join("\n");
+}
